@@ -2,8 +2,6 @@
 
 ## What is built
 
-Real-time hand tracking + voice command pipeline. No ML training. Detect, interpret, output only.
-
 ## Run it
 
 ```bash
@@ -22,7 +20,7 @@ app/utils/config.py           all settings live here
 app/utils/helpers.py          FPS counter, smoother, logger
 ```
 
-## What still needs doing
+## What I still need to be doing
 
 - [ ] Add drawing/canvas layer on top of feed (fingertip draws on screen)
 - [ ] Add gesture recognition (pinch, fist, open hand) not just fingertip
@@ -41,7 +39,7 @@ app/utils/helpers.py          FPS counter, smoother, logger
 0  = wrist
 ```
 
-## To test with a video file
+## To test video file
 
 1. Drop video in app/data/recordings/videos/
 2. config.py → USE_WEBCAM = False
