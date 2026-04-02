@@ -1,5 +1,5 @@
-opencv-python
-mediapipe
-numpy
-SpeechRecognition
 pyaudio
+mediapipe ==0.10.14
+numpy >=2.4.3,<3.0.0
+opencv-python >=4.13.0.92,<5.0.0.0
+SpeechRecognition
