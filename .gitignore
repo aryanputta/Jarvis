@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Data — keep folder structure, ignore actual files
+app/data/recordings/videos/*
+app/data/recordings/images/*
+app/data/logs/commands.txt
+
+# Don't ignore the .gitkeep placeholders
+!app/data/recordings/videos/.gitkeep
+!app/data/recordings/images/.gitkeep
+!app/data/logs/.gitkeep
+
+# Claude / AI tooling
+CLAUDE.md
+.claude/
+
+# Misc
+*.log
+*.mp4
+*.avi
+*.mov
+*.jpg
+*.jpeg
+*.png
