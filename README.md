@@ -1,15 +1,4 @@
-# StyleScan
 
-Gesture-controlled fashion interface built with MediaPipe, OpenCV, and Sobel edge detection. Point, speak, and interact with your digital wardrobe — no touchscreen, no controller, no checkout line.
-
-Amazon Style uses a QR code. We use your hand.
-
-## What it does
-
-- Detects hand landmarks in real time via webcam or video file
-- Tracks index fingertip position with Sobel edge refinement for precise garment selection
-- Listens for voice commands and maps them to styling actions
-- Logs all recognized commands to `app/data/logs/commands.txt`
 
 ## Stack
 
