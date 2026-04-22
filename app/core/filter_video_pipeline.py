@@ -2,7 +2,7 @@ import cv2
 import time
 import numpy as np
 
-from app.core.hand_detection import HandDetector
+from app.core.face_detection import FaceDetector
 from app.core.command_parser import CommandParser
 from app.core.voice_input import listen_command
 from app.utils.config import (
@@ -13,7 +13,7 @@ from app.utils.helpers import FPSCounter, log_command, draw_fps
 from app.processing.drawing import create_ui, Draw
 
 
-detector = HandDetector()
+
 parser = CommandParser()
 fps_counter = FPSCounter()
 
@@ -22,11 +22,12 @@ cap = cv2.VideoCapture(source)
 
 last_command_time = 0
 
-UI = create_ui(FRAME_WIDTH, FRAME_HEIGHT)
+
 canvas = np.full((FRAME_HEIGHT, FRAME_WIDTH, 3), 255, dtype = np.uint8)
 
-drawing_board = Draw(canvas)
 
+
+detector = FaceDetector(canvas)
 while True:
     ret, frame = cap.read()
     if not ret:
@@ -49,25 +50,24 @@ while True:
                 last_command_time = now
                 log_command(command)
 
-    if x is not None and y is not None:
-        cv2.circle(frame, (x, y), 5, (0, 255, 0), -1)
-    if drawing_board.check_index_finger_is_raised(landmarks):
-        if drawing_board.check_if_using_toolbar(x,y) and drawing_board.saved_img ==True:
-            break #quit after saving image
-        if not drawing_board.check_if_using_toolbar(x,y):
-            drawing_board.is_drawing = True
-            drawing_board.create_stroke(landmarks)
-    else:
-        drawing_board.prev_point = None
-    
+    if landmarks is not None:
+        filter_img, hull, hullIndex = detector.load_filter(landmarks,"img.png")
+        for pt in hull:
+            x, y = pt
+            cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
+        if filter_img is not None:
+            print(filter_img)
+            cv2.imshow("Filter", filter_img) #need to draw this on the frame
+        else:
+            print("No filter image")
+            
     output = cv2.addWeighted(frame, 0.6, canvas, 0.4, 0)
-    output[:(FRAME_HEIGHT//8), :] = UI
 
     if command is not None:
         cv2.putText(frame, command, (20, 50),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
-    frame = draw_fps(frame, fps_counter.tick())
+    output = draw_fps(output, fps_counter.tick())
     cv2.imshow("Feed", output)
 
     if cv2.waitKey(1) & 0xFF == 27:  # ESC to quit

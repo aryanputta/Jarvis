@@ -34,8 +34,10 @@ def create_ui(width, height):
                     cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.5, (0, 0, 0), 2)
     
     cv2.rectangle(ui, (width - 100, 10), (width - 10, ui_height - 10), (200, 200, 200), -1)
+    cv2.rectangle(ui, (width - 200, 10), (width - 110, ui_height - 10), (0, 0, 0), 2)
+    cv2.putText(ui, "CLEAR", (width - 190, ui_height // 2 + 5), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.5, (0, 0, 0), 2)
     cv2.rectangle(ui, (width - 100, 10), (width - 10, ui_height - 10), (0, 0, 0), 2)
-    cv2.putText(ui, "CLEAR", (width - 90, ui_height // 2 + 5), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.5, (0, 0, 0), 2)
+    cv2.putText(ui, "SAVE", (width - 90, ui_height // 2 + 5), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.5, (0, 0, 0), 2)
     
     return ui
 
@@ -46,6 +48,7 @@ class Draw:
         self.color_index = 0
         self.canvas = canvas
         self.is_drawing = False
+        self.saved_img = False
         
         
     def update_landmarks(self, new_hand_landmarks):
@@ -56,12 +59,29 @@ class Draw:
             return False
         return hand_landmarks[8].y < hand_landmarks[6].y
     
+    def save_img(self):
+        print("Saved image button accessed")
+        alph = np.ones((FRAME_HEIGHT, FRAME_WIDTH), dtype = np.uint8) * 255 # needed to create an alpha channel to control opacity
+        white_mask = np.all(self.canvas>= 255, axis = 2) #detect all white pixels
+        #set white pixels to transparent to create png effect
+        alph[white_mask] = 0
+        #combine image and save using opencv as png
+        img = np.dstack((self.canvas, alph))
+        cv2.imwrite("img.png", img)
+        self.saved_img = True
+    
     def check_if_using_toolbar(self, index_finger_x, index_finger_y):
        
         if index_finger_y <= ui_height:
-            if index_finger_x >= FRAME_WIDTH - 100: 
+            #clear
+            
+            if (FRAME_WIDTH - 200) <= index_finger_x <= (FRAME_WIDTH - 110) and 10 <= index_finger_y <= (ui_height - 10):
                 self.canvas.fill(255)
                 self.prev_point = None
+            #save image
+            if (FRAME_WIDTH - 100) <= index_finger_x <= (FRAME_WIDTH - 10) and 10 <= index_finger_y <= (ui_height - 10):
+                self.save_img()
+                return True
             
             if index_finger_x <= FRAME_WIDTH - 100:
                 for i, x in enumerate(range(10, 10 + len(colors) * 60, 60)):
@@ -87,4 +107,7 @@ class Draw:
             if dist >= MIN_STROKE_DISTANCE:
                 cv2.line(self.canvas, (int(self.prev_point[0]), int(self.prev_point[1])), (int(index_finger_x), int(index_finger_y)), colors[self.color_index], LINE_THICKNESS)
                 self.prev_point = (index_finger_x, index_finger_y)
-            
+                
+    
+        
+        
