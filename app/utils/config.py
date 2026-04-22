@@ -1,8 +1,23 @@
+from pathlib import Path
+
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+DATA_DIR = BASE_DIR / "data"
+RECORDINGS_DIR = DATA_DIR / "recordings"
+VIDEOS_DIR = RECORDINGS_DIR / "videos"
+IMAGES_DIR = RECORDINGS_DIR / "images"
+LOG_DIR = DATA_DIR / "logs"
+MEMORY_DIR = DATA_DIR / "memory"
+EXPORT_DIR = DATA_DIR / "exports"
+OUTBOX_DIR = DATA_DIR / "outbox"
+SENT_DIR = OUTBOX_DIR / "sent"
+
 CAMERA_INDEX = 0        # change to 1, 2 etc if using external camera
 FRAME_WIDTH = 960
 FRAME_HEIGHT = 720
 USE_WEBCAM = True
-# VIDEO_PATH = "app/data/recordings/videos/sample.mp4"  # drop video name in here
+VIDEO_PATH = str(VIDEOS_DIR / "your_video.mp4")
+OPEN_DESIGN_BOARD_ON_START = True
 
 ENABLE_VOICE = True
 COMMAND_COOLDOWN = 2
@@ -12,3 +27,14 @@ DETECTION_CONFIDENCE = 0.7
 TRACKING_CONFIDENCE = 0.7
 
 EDGE_REGION_SIZE = 80
+
+DEFAULT_USER_NAME = "Aryan"
+LEARNING_MODE_DEFAULT = True
+MEMORY_DB_PATH = str(MEMORY_DIR / "jarvis_memory.db")
+MEMORY_EXPORT_DIR = str(EXPORT_DIR)
+SKETCH_IMAGE_DIR = str(IMAGES_DIR / "sketch_versions")
+EMAIL_OUTBOX_DIR = str(OUTBOX_DIR)
+EMAIL_SENT_DIR = str(SENT_DIR)
+
+MEMORY_PANEL_WIDTH = 360
+MEMORY_PANEL_ITEMS = 4

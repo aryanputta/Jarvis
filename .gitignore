@@ -26,6 +26,14 @@ ENV/
 app/data/recordings/videos/*
 app/data/recordings/images/*
 app/data/logs/commands.txt
+app/data/memory/*.db
+app/data/outbox/
+app/data/exports/boms/
+app/data/exports/demos/
+app/data/exports/plans/
+app/data/exports/pitches/
+app/data/exports/reviews/
+app/data/demo/
 
 # Don't ignore the .gitkeep placeholders
 !app/data/recordings/videos/.gitkeep
