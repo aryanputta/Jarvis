@@ -27,6 +27,8 @@ class SessionLoader:
         latest_text: Optional[str] = None,
         latest_response: Optional[str] = None,
         project_name: Optional[str] = None,
+        voice_status: Optional[str] = None,
+        latest_heard: Optional[str] = None,
     ) -> Dict[str, Any]:
         context = self.load(query=latest_text or "", project_name=project_name)
         dashboard = context["dashboard"]
@@ -43,6 +45,8 @@ class SessionLoader:
             "latest_text": latest_text,
             "latest_response": latest_response or context["greeting"],
             "learning_mode": dashboard["learning_mode"],
+            "voice_status": voice_status or "voice ready",
+            "latest_heard": latest_heard,
         }
 
     @staticmethod

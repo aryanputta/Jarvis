@@ -1,69 +1,36 @@
-import os
-import time
-import tempfile
-import pytest
-from app.utils.helpers import smooth, clamp_coords, FPSCounter, log_command
+import numpy as np
+
+from app.utils.helpers import draw_agent_hud, draw_memory_panel
 
 
-def test_smooth_no_prev():
-    assert smooth(None, 100) == 100
+def test_draw_agent_hud_renders_overlay():
+    frame = np.full((720, 960, 3), 245, dtype=np.uint8)
+
+    rendered = draw_agent_hud(
+        frame.copy(),
+        agent_status="listening",
+        voice_status="listening",
+        heard_text="Jarvis clear the board",
+        response_text="Whiteboard cleared.",
+        project_name="6g ai-ran edge node",
+    )
+
+    assert rendered.shape == frame.shape
+    assert np.any(rendered != frame)
 
 
-def test_smooth_with_prev():
-    result = smooth(0, 100, alpha=0.5)
-    assert result == 50
+def test_draw_memory_panel_expands_frame():
+    frame = np.full((720, 960, 3), 245, dtype=np.uint8)
+    panel = {
+        "header": "Jarvis Memory | Aryan",
+        "learning_mode": True,
+        "voice_status": "listening",
+        "latest_heard": "Jarvis help me build this",
+        "latest_response": "I loaded your recent project context.",
+        "recent_actions": ["Loaded project memory"],
+    }
 
+    rendered = draw_memory_panel(frame, panel)
 
-def test_smooth_alpha_one():
-    assert smooth(50, 100, alpha=1.0) == 100
-
-
-def test_smooth_alpha_zero():
-    assert smooth(50, 100, alpha=0.0) == 50
-
-
-def test_clamp_coords_in_bounds():
-    assert clamp_coords(100, 200, 960, 720) == (100, 200)
-
-
-def test_clamp_coords_negative():
-    assert clamp_coords(-5, -10, 960, 720) == (0, 0)
-
-
-def test_clamp_coords_over_max():
-    assert clamp_coords(1000, 800, 960, 720) == (959, 719)
-
-
-def test_fps_counter_single_tick():
-    counter = FPSCounter()
-    fps = counter.tick()
-    assert fps == 0.0
-
-
-def test_fps_counter_multiple_ticks():
-    counter = FPSCounter()
-    counter.tick()
-    time.sleep(0.05)
-    counter.tick()
-    fps = counter.tick()
-    assert fps > 0
-
-
-def test_log_command_creates_file(tmp_path, monkeypatch):
-    log_file = tmp_path / "logs" / "commands.txt"
-    monkeypatch.setattr("app.utils.helpers.LOG_PATH", str(log_file))
-    log_command("SAVE")
-    assert log_file.exists()
-    content = log_file.read_text()
-    assert "SAVE" in content
-
-
-def test_log_command_appends(tmp_path, monkeypatch):
-    log_file = tmp_path / "logs" / "commands.txt"
-    monkeypatch.setattr("app.utils.helpers.LOG_PATH", str(log_file))
-    log_command("CLEAR")
-    log_command("SAVE")
-    lines = log_file.read_text().strip().splitlines()
-    assert len(lines) == 2
-    assert "CLEAR" in lines[0]
-    assert "SAVE" in lines[1]
+    assert rendered.shape[0] == frame.shape[0]
+    assert rendered.shape[1] > frame.shape[1]

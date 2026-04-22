@@ -3,3 +3,4 @@ mediapipe
 numpy
 SpeechRecognition
 pyaudio
+openai>=2.17.0

@@ -261,8 +261,11 @@ class MemoryAgent:
             if response_style and response_style not in style_parts:
                 style_parts.append(str(response_style))
             if style_parts:
-                return f"Using your usual {' '.join(style_parts)} style."
-            return "Drafting an email in your saved default style."
+                return f"I'll draft this in your usual {' '.join(style_parts)} style and keep it sounding natural."
+            return "I'll draft a natural email about this and keep it sounding like you."
+
+        if any(token in normalized for token in {"cad model", "3d model", "show the cad", "show me the cad"}):
+            return "I'll generate a concept model and pin it to the board so you can react to it right away."
 
         if project_state and any(token in normalized for token in {"continue", "resume", "build", "work on"}):
             fragments = []

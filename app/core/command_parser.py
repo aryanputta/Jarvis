@@ -7,8 +7,12 @@ class CommandParser:
         if not text:
             return None
 
-        if "email" in text and any(word in text for word in {"write", "draft", "send", "share"}):
+        if "email" in text and any(word in text for word in {"write", "draft", "send", "share", "generate", "compose", "make", "create"}):
             return "WRITE_EMAIL"
+        elif any(word in text for word in {"show", "generate", "create", "render"}) and any(
+            phrase in text for phrase in {"cad model", "3d model", "cad concept", "design model", "show the cad", "show me the cad"}
+        ):
+            return "GENERATE_CAD_CONCEPT"
         elif any(word in text for word in {"bom", "bill of materials", "parts list", "cost estimate", "budget estimate"}):
             return "GENERATE_BOM"
         elif any(word in text for word in {"critique", "review", "improve"}) and any(
@@ -41,6 +45,10 @@ class CommandParser:
             return "CLOSE_BOARD"
         elif "open" in text and ("board" in text or "canvas" in text or "whiteboard" in text):
             return "OPEN_BOARD"
+        elif any(word in text for word in {"clear", "erase", "wipe", "reset"}) and any(
+            target in text for target in {"board", "canvas", "whiteboard", "drawing"}
+        ):
+            return "CLEAR"
         elif "clear" in text or "erase" in text:
             return "CLEAR"
         elif "save" in text:

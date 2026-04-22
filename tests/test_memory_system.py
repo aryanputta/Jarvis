@@ -145,6 +145,9 @@ def test_email_composer_builds_draft_with_attachment(tmp_path):
     assert draft["project_name"] == "6g ai-ran edge node"
     assert draft["recipients"] == ["Aryan", "Shrihan"]
     assert "summer" in draft["subject"].lower()
+    assert draft["style"] == "collaborative"
+    assert "really solid project to build over the summer" in draft["body"]
+    assert "I'd love your take before I lock anything in." in draft["body"]
     assert draft["attachments"]
     assert draft["delivery_state"] == "sent_demo"
     assert Path(draft["eml_path"]).exists()

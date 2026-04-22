@@ -51,6 +51,20 @@ def test_bom_command_generates_cost_estimate(tmp_path):
     assert Path(result.artifact_paths[1]).exists()
 
 
+def test_cad_concept_command_generates_preview(tmp_path):
+    agent = build_agent(tmp_path)
+    result = agent.handle_task_command(
+        "GENERATE_CAD_CONCEPT",
+        "Show me the CAD model for this project.",
+        active_project="6g ai-ran edge node",
+    )
+
+    assert result is not None
+    assert result.preview_image_path is not None
+    assert Path(result.preview_image_path).exists()
+    assert Path(result.artifact_paths[1]).exists()
+
+
 def test_design_review_and_demo_script_are_available(tmp_path):
     agent = build_agent(tmp_path)
     review = agent.handle_task_command(

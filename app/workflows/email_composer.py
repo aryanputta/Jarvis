@@ -7,6 +7,7 @@ from email.message import EmailMessage
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from app.agents.llm_client import JarvisLLMClient
 from app.agents.memory_agent import MemoryAgent
 from app.utils.config import EMAIL_OUTBOX_DIR, EMAIL_SENT_DIR
 
@@ -19,10 +20,12 @@ class EmailComposer:
     def __init__(
         self,
         memory_agent: MemoryAgent,
+        llm_client: Optional[JarvisLLMClient] = None,
         outbox_dir: str = EMAIL_OUTBOX_DIR,
         sent_dir: str = EMAIL_SENT_DIR,
     ):
         self.memory_agent = memory_agent
+        self.llm_client = llm_client or JarvisLLMClient()
         self.outbox_dir = Path(outbox_dir)
         self.outbox_dir.mkdir(parents=True, exist_ok=True)
         self.sent_dir = Path(sent_dir)
@@ -40,8 +43,21 @@ class EmailComposer:
         attachment = self._latest_attachment(target_project)
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         send_requested = self._send_requested(request_text)
-        subject = self._build_subject(request_text, target_project)
-        body = self._build_body(request_text, target_project, project_state, attachment, recipients)
+        style = self._detect_style(request_text, recipients)
+        llm_draft = self._draft_with_llm(
+            request_text=request_text,
+            project_name=target_project,
+            project_state=project_state,
+            recipients=recipients,
+            attachment=attachment,
+            style=style,
+        )
+        subject = llm_draft["subject"] if llm_draft else self._build_subject(request_text, target_project)
+        body = (
+            llm_draft["body"]
+            if llm_draft
+            else self._build_body(request_text, target_project, project_state, attachment, recipients, style)
+        )
         outbox_base = self.outbox_dir / f"{_slugify(target_project)}-{timestamp}"
 
         eml_path = outbox_base.with_suffix(".eml")
@@ -76,6 +92,7 @@ class EmailComposer:
             "recipients": recipients,
             "subject": subject,
             "body": body,
+            "style": style,
             "attachments": attachments,
             "request_text": request_text,
             "delivery_state": "draft_ready",
@@ -169,9 +186,9 @@ class EmailComposer:
     def _build_subject(self, request_text: str, project_name: str) -> str:
         lowered = request_text.lower()
         if "summer" in lowered:
-            return f"Summer build idea for {project_name.title()}"
+            return f"Want to build {project_name.title()} over the summer?"
         if "cad" in lowered:
-            return f"CAD design update for {project_name.title()}"
+            return f"Latest CAD concept for {project_name.title()}"
         return f"Design update for {project_name.title()}"
 
     def _build_body(
@@ -181,55 +198,140 @@ class EmailComposer:
         project_state: Dict[str, object],
         attachment: Optional[Dict[str, object]],
         recipients: List[str],
+        style: str,
     ) -> str:
         greeting = f"Hi {self._join_names(recipients)},"
         lines = [greeting, ""]
-
-        if "cad" in request_text.lower():
-            lines.append(f"I wanted to share the latest CAD design for {project_name}.")
-        else:
-            lines.append(f"I wanted to share the latest design update for {project_name}.")
-
+        project_title = project_name.title()
+        lowered = request_text.lower()
+        mention_cad = "cad" in lowered
         last_version = project_state.get("last_version")
-        if last_version:
-            lines.append(f"This is based on the current {last_version} version.")
-
         preferred_design = project_state.get("preferred_design")
-        if preferred_design:
-            lines.append(f"I've been shaping it around a {preferred_design} layout.")
-
         budget_limit = project_state.get("budget_limit")
+        open_tasks = project_state.get("open_tasks") or []
+        lead = self._lead_sentence(project_title, mention_cad, style)
+        lines.append(lead)
+
+        context_bits = []
+        if last_version:
+            context_bits.append(f"the latest version is based on {last_version}")
+        if preferred_design:
+            context_bits.append(f"I'm leaning toward a {preferred_design} layout")
         if budget_limit is not None:
-            lines.append(f"I'm also trying to keep it under the ${budget_limit} budget target.")
+            context_bits.append(f"I'm trying to keep the build around ${budget_limit}")
+        if context_bits:
+            lines.append(self._join_bits(context_bits).capitalize() + ".")
 
         if attachment:
-            lines.append(
-                f"I attached the latest saved design snapshot ({Path(str(attachment['image_path'])).name}) for reference."
-            )
+            attachment_name = Path(str(attachment["image_path"])).name
+            lines.append(f"I attached the latest design snapshot so you can see where it stands right now ({attachment_name}).")
 
-        if "summer" in request_text.lower():
-            lines.append("I'd like to build this over the summer and keep iterating on it.")
+        if "summer" in lowered:
+            lines.append("I think this would be a really solid project to build over the summer, and I want to keep pushing it toward a real working system.")
         else:
-            lines.append("I'd like to keep iterating on it and turn it into a real build.")
+            lines.append("I want to keep iterating on it until it turns into something we can actually build.")
 
-        open_tasks = project_state.get("open_tasks") or []
         if open_tasks:
-            lines.append(f"Next steps on my side are {', '.join(open_tasks[:3])}.")
+            lines.append(f"My next steps are {', '.join(open_tasks[:3])}, but I'd love your take before I lock anything in.")
+        else:
+            lines.append("I'd love your take on the design direction before I go much further with it.")
 
-        lines.extend(
-            [
-                "",
-                "Let me know what you think and if you want to build on this with me.",
-                "",
-                f"- {self.memory_agent.user_name}",
-            ]
-        )
+        lines.extend(["", self._closing(style), "", self._signature(style)])
         return "\n".join(lines)
+
+    def _detect_style(self, request_text: str, recipients: List[str]) -> str:
+        lowered = request_text.lower()
+        saved_style = self.memory_agent.load_preferences().get("default_email_style")
+        if "professional" in lowered:
+            return "professional"
+        if any(token in lowered for token in {"friend", "summer", "build this with me", "what do you think"}):
+            return "collaborative"
+        if len(recipients) > 1 and self.memory_agent.user_name in recipients:
+            return "collaborative"
+        if saved_style:
+            return str(saved_style)
+        return "friendly"
+
+    @staticmethod
+    def _lead_sentence(project_title: str, mention_cad: bool, style: str) -> str:
+        if style == "professional":
+            if mention_cad:
+                return f"I wanted to share the latest CAD design for {project_title} and get your feedback."
+            return f"I wanted to share the latest design update for {project_title} and get your feedback."
+        if mention_cad:
+            return f"I wanted to send over the latest CAD design for {project_title} because I think it's starting to come together."
+        return f"I wanted to send over the latest design update for {project_title} because it's starting to take shape."
+
+    @staticmethod
+    def _closing(style: str) -> str:
+        if style == "professional":
+            return "I'd appreciate any feedback you have, especially on the design direction and what I should tighten up next."
+        if style == "collaborative":
+            return "Let me know what you think, and if you're down, I'd love to build on this together."
+        return "Let me know what you think. I'm happy to keep iterating on it."
+
+    def _signature(self, style: str) -> str:
+        if style == "professional":
+            return f"Best,\n{self.memory_agent.user_name}"
+        return f"{self.memory_agent.user_name}"
+
+    def _draft_with_llm(
+        self,
+        request_text: str,
+        project_name: str,
+        project_state: Dict[str, object],
+        recipients: List[str],
+        attachment: Optional[Dict[str, object]],
+        style: str,
+    ) -> Optional[Dict[str, str]]:
+        if not self.llm_client.available():
+            return None
+
+        instructions = (
+            "You are Jarvis drafting a natural, human-sounding email for a student builder. "
+            "Sound warm, confident, and specific. Avoid robotic phrasing. "
+            "Return only valid JSON with keys subject and body."
+        )
+        prompt = json.dumps(
+            {
+                "user_name": self.memory_agent.user_name,
+                "request": request_text,
+                "project_name": project_name,
+                "project_state": project_state,
+                "recipients": recipients,
+                "attachment_name": Path(str(attachment["image_path"])).name if attachment else None,
+                "style": style,
+                "constraints": [
+                    "Keep it concise and natural",
+                    "Reference the project concretely",
+                    "If the request mentions summer, mention wanting to build it over the summer",
+                    "End like a real person, not a bot",
+                ],
+            },
+            indent=2,
+        )
+        payload, _error = self.llm_client.generate_json(instructions, prompt, max_output_tokens=700)
+        if not payload:
+            return None
+
+        subject = str(payload.get("subject") or "").strip()
+        body = str(payload.get("body") or "").strip()
+        if not subject or not body:
+            return None
+        return {"subject": subject, "body": body}
 
     @staticmethod
     def _send_requested(request_text: str) -> bool:
         lowered = request_text.lower()
         return "send" in lowered
+
+    @staticmethod
+    def _join_bits(parts: List[str]) -> str:
+        if len(parts) == 1:
+            return parts[0]
+        if len(parts) == 2:
+            return f"{parts[0]} and {parts[1]}"
+        return ", ".join(parts[:-1]) + f", and {parts[-1]}"
 
     @staticmethod
     def _join_names(names: List[str]) -> str:

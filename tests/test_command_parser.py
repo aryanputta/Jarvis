@@ -31,12 +31,28 @@ def test_clear(parser):
     assert parser.parse("clear") == "CLEAR"
 
 
+def test_clear_board(parser):
+    assert parser.parse("clear board") == "CLEAR"
+
+
+def test_wipe_whiteboard(parser):
+    assert parser.parse("wipe the whiteboard") == "CLEAR"
+
+
 def test_clear_memory(parser):
     assert parser.parse("clear memory") == "CLEAR_MEMORY"
 
 
 def test_write_email(parser):
     assert parser.parse("write an email about this CAD design and send it to me and Shrihan") == "WRITE_EMAIL"
+
+
+def test_generate_email(parser):
+    assert parser.parse("generate an email about this project and send it to Shrihan") == "WRITE_EMAIL"
+
+
+def test_generate_cad_concept(parser):
+    assert parser.parse("show me the cad model for this project") == "GENERATE_CAD_CONCEPT"
 
 
 def test_pitch_project(parser):

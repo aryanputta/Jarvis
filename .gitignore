@@ -11,9 +11,11 @@ build/
 
 # Virtual environments
 .venv/
+.venv312/
 venv/
 env/
 ENV/
+.pytest_cache/
 
 # IDE
 .vscode/
@@ -29,6 +31,7 @@ app/data/logs/commands.txt
 app/data/memory/*.db
 app/data/outbox/
 app/data/exports/boms/
+app/data/exports/cad_concepts/
 app/data/exports/demos/
 app/data/exports/plans/
 app/data/exports/pitches/
@@ -43,6 +46,12 @@ app/data/demo/
 # Claude / AI tooling
 CLAUDE.md
 .claude/
+
+# Local secrets
+.env
+.env.local
+.env.*
+!.env.example
 
 # Misc
 *.log

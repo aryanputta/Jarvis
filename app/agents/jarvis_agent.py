@@ -2,9 +2,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from app.agents.llm_client import JarvisLLMClient
 from app.agents.memory_agent import MemoryAgent
 from app.workflows.bom_generator import BOMComposer
 from app.workflows.build_plan import BuildPlanComposer
+from app.workflows.cad_designer import CADDesigner
 from app.workflows.demo_script import DemoScriptComposer
 from app.workflows.design_critic import DesignCritic
 from app.workflows.email_composer import EmailComposer
@@ -19,24 +21,30 @@ class AgentActionResult:
     artifact_paths: List[str] = field(default_factory=list)
     facts: Dict[str, Any] = field(default_factory=dict)
     context: Optional[Dict[str, Any]] = None
+    preview_image_path: Optional[str] = None
+    preview_title: Optional[str] = None
 
 
 class JarvisAgent:
     def __init__(
         self,
         memory_agent: MemoryAgent,
+        llm_client: Optional[JarvisLLMClient] = None,
         email_composer: Optional[EmailComposer] = None,
         pitch_composer: Optional[ProjectPitchComposer] = None,
         build_plan_composer: Optional[BuildPlanComposer] = None,
         bom_composer: Optional[BOMComposer] = None,
+        cad_designer: Optional[CADDesigner] = None,
         design_critic: Optional[DesignCritic] = None,
         demo_script_composer: Optional[DemoScriptComposer] = None,
     ):
         self.memory_agent = memory_agent
-        self.email_composer = email_composer or EmailComposer(memory_agent)
+        self.llm_client = llm_client or JarvisLLMClient()
+        self.email_composer = email_composer or EmailComposer(memory_agent, llm_client=self.llm_client)
         self.pitch_composer = pitch_composer or ProjectPitchComposer(memory_agent)
         self.build_plan_composer = build_plan_composer or BuildPlanComposer(memory_agent)
         self.bom_composer = bom_composer or BOMComposer(memory_agent)
+        self.cad_designer = cad_designer or CADDesigner(memory_agent, llm_client=self.llm_client)
         self.design_critic = design_critic or DesignCritic(memory_agent)
         self.demo_script_composer = demo_script_composer or DemoScriptComposer(memory_agent)
         self.session_loader = SessionLoader(memory_agent)
@@ -53,7 +61,7 @@ class JarvisAgent:
             return AgentActionResult(
                 message=(
                     f"I {delivery_phrase} to {', '.join(draft['recipients'])} with the latest design attached. "
-                    f"Saved {Path(str(draft['eml_path'])).name} in the outbox."
+                    f"The draft sounds more like a real message, not a template."
                 ),
                 project_name=str(draft["project_name"]),
                 artifact_paths=[
@@ -65,6 +73,22 @@ class JarvisAgent:
                     "email_delivery_state": draft["delivery_state"],
                     "email_attachment": Path(draft["attachments"][0]).name if draft["attachments"] else "",
                 },
+            )
+
+        if command == "GENERATE_CAD_CONCEPT":
+            concept = self.cad_designer.compose(request_text=request_text, project_name=active_project)
+            return AgentActionResult(
+                message=(
+                    f"I generated a concept model for {concept['project_name']} and pinned the preview to the board so you can sketch over it."
+                ),
+                project_name=str(concept["project_name"]),
+                artifact_paths=[str(concept["preview_path"]), str(concept["spec_path"]), str(concept["summary_path"])],
+                facts={
+                    "cad_preview_path": concept["preview_path"],
+                    "cad_summary": concept["summary"],
+                },
+                preview_image_path=str(concept["preview_path"]),
+                preview_title=str(concept["title"]),
             )
 
         if command == "PITCH_PROJECT":
@@ -137,13 +161,9 @@ class JarvisAgent:
             capabilities = self.capabilities_for_project(project_name)
             message = "I can " + ", ".join(capabilities[:-1]) + f", and {capabilities[-1]}."
         else:
-            message = self.memory_agent.generate_response(
-                text,
-                project_name=project_name,
-                context=context,
-            )
+            message = self._generate_conversation_reply(text, project_name, context)
             if project_name and any(token in normalized for token in {"project", "design", "build", "next"}):
-                message += " I can also build the plan, BOM, critique, pitch, demo script, or email for this project."
+                message += " I can also build the plan, BOM, critique, pitch, demo script, email, or a CAD concept preview for this project."
 
         return AgentActionResult(
             message=message,
@@ -156,9 +176,42 @@ class JarvisAgent:
         return [
             f"remember the important context for {subject}",
             "draft and demo-send project emails",
+            "generate and pin a CAD concept preview",
             "write project pitches",
             "build a step-by-step project plan",
             "estimate a BOM and cost",
             "critique the design",
             "write your demo script",
         ]
+
+    def _generate_conversation_reply(
+        self,
+        text: str,
+        project_name: Optional[str],
+        context: Dict[str, Any],
+    ) -> str:
+        if self.llm_client.available():
+            project_state = context.get("project_state") or {}
+            memories = [memory["content"] for memory in context.get("relevant_memories", [])[:3]]
+            instructions = (
+                "You are Jarvis, a friendly personal engineering assistant. "
+                "Sound natural, slightly cool, and human. "
+                "Be concise but specific. Avoid robotic phrasing."
+            )
+            prompt = (
+                f"User name: {self.memory_agent.user_name}\n"
+                f"Project: {project_name or 'none'}\n"
+                f"Project state: {project_state}\n"
+                f"Relevant memories: {memories}\n"
+                f"User said: {text}\n"
+                "Reply as Jarvis in first person. If the user asks for action on a project, sound proactive."
+            )
+            result = self.llm_client.generate_text(instructions, prompt, max_output_tokens=450)
+            if result.ok and result.text:
+                return result.text.strip()
+
+        return self.memory_agent.generate_response(
+            text,
+            project_name=project_name,
+            context=context,
+        )
