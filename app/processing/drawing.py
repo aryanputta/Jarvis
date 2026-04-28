@@ -3,6 +3,7 @@ import numpy as np
 import mediapipe as mp
 import time
 import warnings
+import os
 
 
 from app.utils.config import (FRAME_WIDTH, FRAME_HEIGHT, MIN_STROKE_DISTANCE, LINE_THICKNESS)
@@ -16,6 +17,7 @@ colorIndex = 0
 points = [[] for _ in range(len(colors))]
 ui_height= FRAME_HEIGHT // 8 
 
+"""
 def create_ui(width, height):
     
     ui = np.zeros((ui_height, width, 3), dtype=np.uint8)
@@ -40,6 +42,24 @@ def create_ui(width, height):
     cv2.putText(ui, "SAVE", (width - 90, ui_height // 2 + 5), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.5, (0, 0, 0), 2)
     
     return ui
+"""
+def create_ui(width, height):
+    ui_height = height // 8
+    
+    # Use the filename you actually gave the PNG
+    img_path = os.path.join("app", "assets", "toolbar.PNG") 
+    
+    overlay_img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
+    
+    if overlay_img is None:
+        print(f"CRITICAL ERROR: Image not found at {img_path}")
+        # Create a dummy 4-channel transparent placeholder so the pipeline doesn't crash
+        return np.zeros((ui_height, width, 4), dtype=np.uint8)
+
+    # Resize to match your frame width and the 1/8th height
+    overlay_img = cv2.resize(overlay_img, (width, ui_height))
+    
+    return overlay_img # Returning all 4 channels (BGRA)
 
 #toolbar is split [0,860] v [860,960]
 class Draw:
@@ -62,9 +82,9 @@ class Draw:
     def save_img(self):
         print("Saved image button accessed")
         alph = np.ones((FRAME_HEIGHT, FRAME_WIDTH), dtype = np.uint8) * 255 # needed to create an alpha channel to control opacity
-        white_mask = np.all(self.canvas>= 255, axis = 2) #detect all white pixels
+        black_mask = np.all(self.canvas<= 0, axis = 2) #detect all black pixels
         #set white pixels to transparent to create png effect
-        alph[white_mask] = 0
+        alph[black_mask] = 0
         #combine image and save using opencv as png
         img = np.dstack((self.canvas, alph))
         cv2.imwrite("img.png", img)
@@ -76,7 +96,7 @@ class Draw:
             #clear
             
             if (FRAME_WIDTH - 200) <= index_finger_x <= (FRAME_WIDTH - 110) and 10 <= index_finger_y <= (ui_height - 10):
-                self.canvas.fill(255)
+                self.canvas.fill(0)
                 self.prev_point = None
             #save image
             if (FRAME_WIDTH - 100) <= index_finger_x <= (FRAME_WIDTH - 10) and 10 <= index_finger_y <= (ui_height - 10):

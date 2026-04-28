@@ -23,7 +23,7 @@ cap = cv2.VideoCapture(source)
 last_command_time = 0
 
 UI = create_ui(FRAME_WIDTH, FRAME_HEIGHT)
-canvas = np.full((FRAME_HEIGHT, FRAME_WIDTH, 3), 255, dtype = np.uint8)
+canvas = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), dtype = np.uint8)
 
 drawing_board = Draw(canvas)
 
@@ -57,15 +57,35 @@ while True:
         if drawing_board.check_if_using_toolbar(x,y) and drawing_board.saved_img ==True:
             image_saved = True
             break #quit after saving image
-            
+
         if not drawing_board.check_if_using_toolbar(x,y):
+            print("this is the landmark values", x,y)
             drawing_board.is_drawing = True
             drawing_board.create_stroke(landmarks)
     else:
         drawing_board.prev_point = None
     
-    output = cv2.addWeighted(frame, 0.6, canvas, 0.4, 0)
-    output[:(FRAME_HEIGHT//8), :] = UI
+    ##output = cv2.addWeighted(frame, 1.0, canvas, 1.0, 0)
+    ##output[:(FRAME_HEIGHT//8), :] = UI
+    # 1. Create a mask of where you have drawn (anything that isn't black)
+    gray_canvas = cv2.cvtColor(canvas, cv2.COLOR_BGR2GRAY)
+    _, mask = cv2.threshold(gray_canvas, 1, 255, cv2.THRESH_BINARY)
+
+    # 2. Start with the webcam frame
+    output = frame.copy()
+
+    # 3. Only paste the canvas colors where the mask is active
+    output[mask > 0] = canvas[mask > 0]
+
+    # Assuming you modified create_ui to return the image with 4 channels (BGRA)
+    ui_h = FRAME_HEIGHT // 8
+    roi = output[0:ui_h, 0:FRAME_WIDTH]
+    bgr = UI[:, :, :3] ## 1st 3 channels(colors)
+    alpha = UI[:, :, 3] / 255.0 #4th channel - transparency 
+
+    for c in range(0, 3):
+        roi[:, :, c] = (alpha * bgr[:, :, c] + (1 - alpha) * roi[:, :, c])
+    output[0:ui_h, 0:FRAME_WIDTH] = roi
 
     if command is not None:
         cv2.putText(frame, command, (20, 50),
