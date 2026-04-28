@@ -11,7 +11,7 @@ from app.utils.config import (
 )
 from app.utils.helpers import FPSCounter, log_command, draw_fps
 from app.processing.drawing import create_ui, Draw
-
+import sys, subprocess
 
 detector = HandDetector()
 parser = CommandParser()
@@ -26,6 +26,8 @@ UI = create_ui(FRAME_WIDTH, FRAME_HEIGHT)
 canvas = np.full((FRAME_HEIGHT, FRAME_WIDTH, 3), 255, dtype = np.uint8)
 
 drawing_board = Draw(canvas)
+
+image_saved = False
 
 while True:
     ret, frame = cap.read()
@@ -53,7 +55,9 @@ while True:
         cv2.circle(frame, (x, y), 5, (0, 255, 0), -1)
     if drawing_board.check_index_finger_is_raised(landmarks):
         if drawing_board.check_if_using_toolbar(x,y) and drawing_board.saved_img ==True:
+            image_saved = True
             break #quit after saving image
+            
         if not drawing_board.check_if_using_toolbar(x,y):
             drawing_board.is_drawing = True
             drawing_board.create_stroke(landmarks)
@@ -73,5 +77,7 @@ while True:
     if cv2.waitKey(1) & 0xFF == 27:  # ESC to quit
         break
 
+if (image_saved):
+    subprocess.run([sys.executable, "app/core/filter_video_pipeline.py"])
 cap.release()
 cv2.destroyAllWindows()

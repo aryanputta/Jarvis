@@ -1,7 +1,9 @@
 import cv2
 import time
 import numpy as np
-
+import os, sys
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.insert(0, project_root)
 from app.core.face_detection import FaceDetector
 from app.core.command_parser import CommandParser
 from app.core.voice_input import listen_command
@@ -54,10 +56,10 @@ while True:
         filter_img, hull, hullIndex = detector.load_filter(landmarks,"img.png")
         for pt in hull:
             x, y = pt
-            cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
+            #cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
         if filter_img is not None:
             print(filter_img)
-            cv2.imshow("Filter", filter_img) #need to draw this on the frame
+            frame = detector.apply_filter_simple(frame, filter_img, hull)
         else:
             print("No filter image")
             

@@ -1,7 +1,10 @@
 import cv2
 import mediapipe as mp
 import numpy as np
+import sys, os
 #import faceBlendCommon as fbc
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.insert(0, project_root)
 
 _mp_draw = mp.solutions.drawing_utils
 mp_face_mesh = mp.solutions.face_mesh
@@ -81,3 +84,49 @@ class FaceDetector:
         #dt = fbc.calculateDelaunayTriangles(rect, hull)
         
         return img, hull, hullIndex
+    def apply_filter_simple(self, frame, filter_img, hull):
+        hull = np.array(hull, dtype = np.int32).reshape(-1,2)
+
+        #filter_resized = cv2.resize(filter_img, (w, h))
+
+        center_x = int(np.mean(hull[:, 0]))
+        center_y = int(np.mean(hull[:, 1]))
+
+        fh, fw = filter_img.shape[:2]
+        h, w = frame.shape[:2]
+        x1 = center_x - fw // 2
+        y1 = center_y - fh // 2
+        x2 = x1 + fw
+        y2 = y1 + fh
+        
+        frame_x1 = max(0, x1)
+        frame_y1 = max(0, y1)
+        frame_x2 = min(w, x2)
+        frame_y2 = min(h, y2)
+        
+        # keep within bounds 
+        if frame_x1 >= frame_x2 or frame_y1 >= frame_y2:
+            return frame
+
+        #crop 
+        filter_x1 = frame_x1 - x1
+        filter_y1 = frame_y1 - y1
+        filter_x2 = filter_x1 + (frame_x2 - frame_x1)
+        filter_y2 = filter_y1 + (frame_y2 - frame_y1)
+
+        cropped_filter = filter_img[filter_y1:filter_y2, filter_x1: filter_x2]
+        roi = frame[frame_y1: frame_y2, frame_x1:frame_x2]
+
+        if cropped_filter.shape[2] == 4:
+            alpha = cropped_filter[:, :, 3] / 255.0
+            print(alpha.shape, roi.shape)
+            for c in range(3):
+                roi[:, :, c] = (
+                    (1 - alpha) * roi[:, :, c] +
+                    alpha * cropped_filter[:, :, c]
+                )
+        else:
+            roi[:] = cropped_filter[:, :, :3]
+
+        frame[max(0,y1):min(h,y2), max(0,x1):min(w,x2)] = roi
+        return frame
